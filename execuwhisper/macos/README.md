@@ -107,28 +107,26 @@ For users who want everything compiled from source.
 brew install xcodegen libomp
 ```
 
-### Upstream ExecuTorch PRs (in review)
+### Upstream ExecuTorch PRs
 
-The helper binaries this app embeds live in three PRs against `pytorch/executorch` that have not yet landed on `main`. Until they merge, check them out locally:
+Two of the three helper PRs against `pytorch/executorch` have landed on `main`; the formatter helper is still in review. Build against a recent `main` checkout (which already includes the merged PRs) and add the one remaining PR:
 
-| PR | What it adds | Where it lands |
-|---|---|---|
-| [pytorch/executorch#18861](https://github.com/pytorch/executorch/pull/18861) | `parakeet_helper` (ASR runtime, Metal) + `make parakeet-metal` | `cmake-out/examples/models/parakeet/parakeet_helper` |
-| [pytorch/executorch#19195](https://github.com/pytorch/executorch/pull/19195) | LFM2.5 MLX export pipeline + `lfm2_5_350m` model class + `lfm_2_5-mlx` Makefile target | export-time only |
-| [pytorch/executorch#19562](https://github.com/pytorch/executorch/pull/19562) | `lfm25_formatter_helper` (formatter runtime, MLX) + `make lfm_2_5_formatter-mlx` | `cmake-out/examples/models/llama/lfm25_formatter_helper` |
+| PR | What it adds | Where it lands | Status |
+|---|---|---|---|
+| [pytorch/executorch#18861](https://github.com/pytorch/executorch/pull/18861) | `parakeet_helper` (ASR runtime, Metal) + `make parakeet-metal` | `cmake-out/examples/models/parakeet/parakeet_helper` | Merged |
+| [pytorch/executorch#19195](https://github.com/pytorch/executorch/pull/19195) | LFM2.5 MLX export pipeline + `lfm2_5_350m` model class + `lfm_2_5-mlx` Makefile target | export-time only | Merged |
+| [pytorch/executorch#19562](https://github.com/pytorch/executorch/pull/19562) | `lfm25_formatter_helper` (formatter runtime, MLX) + `make lfm_2_5_formatter-mlx` | `cmake-out/examples/models/llama/lfm25_formatter_helper` | In review |
 
-Apply all three before building:
+Check out the remaining PR before building:
 
 ```bash
 git clone https://github.com/pytorch/executorch ~/executorch
 cd ~/executorch
-gh pr checkout 18861 -b parakeet
-gh pr checkout 19195 -b lfm25-export
 gh pr checkout 19562 -b lfm25-helper
-# Resolve any conflicts manually if the three branches don't merge cleanly.
+# Resolve any conflicts manually if the branch doesn't merge cleanly onto main.
 ```
 
-If `gh pr checkout` is unavailable, the equivalent is `git fetch origin pull/<n>/head:<branch>` followed by a merge or cherry-pick.
+If `gh pr checkout` is unavailable, the equivalent is `git fetch origin pull/19562/head:lfm25-helper` followed by a merge or cherry-pick.
 
 ### 1. Set up the conda environments
 
@@ -250,7 +248,7 @@ To retrain or adapt the formatter to a new domain (e.g. medical, legal, multilin
 ## Status & Known Issues
 
 - macOS-only; no iOS/Linux/Windows app yet.
-- The three upstream ExecuTorch PRs (#18861, #19195, #19562) are in review. Until they land, follow the [Build From Source](#build-from-source) workflow or use the prebuilt helpers from the GitHub Release.
+- Two of the three upstream ExecuTorch PRs (#18861, #19195) have landed on `main`; the formatter helper (#19562) is still in review. Until it lands, follow the [Build From Source](#build-from-source) workflow or use the prebuilt helpers from the GitHub Release.
 - The formatter occasionally over-summarizes self-corrections ("actually, no — make it tomorrow") and may drop the closing name in email-style sign-offs. See the model card for full eval numbers and limitations.
 - Long inputs are chunked at a 30-word boundary on word splits; very short follow-up clauses can land in their own chunk and get capitalized as if starting a new sentence. A smarter chunker is on the follow-up list.
 - No telemetry. The app makes one network call: first-launch model download from `huggingface.co`. After that, all inference is local.
