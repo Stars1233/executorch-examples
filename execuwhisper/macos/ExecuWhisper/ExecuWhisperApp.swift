@@ -11,9 +11,9 @@ import SwiftUI
 
 @main
 struct ExecuWhisperApp: App {
-    @State private var preferences = Preferences()
-    @State private var downloader = ModelDownloader()
-    @State private var replacementStore = ReplacementStore()
+    @State private var preferences: Preferences
+    @State private var downloader: ModelDownloader
+    @State private var replacementStore: ReplacementStore
     @State private var store: TranscriptStore
     @State private var dictationManager: DictationManager
 

@@ -200,6 +200,29 @@ struct TextPipelineTests {
     }
 
     @Test
+    func promptExampleLeakDetectionUsesExamplesFromPrompt() {
+        let prompt = """
+        Instructions
+
+        Examples:
+        Dictation: alpha beta
+        Output: Alpha, beta.
+
+        Dictation: gamma delta
+        Output: Gamma, delta.
+
+        Dictation: current words
+        Output:
+        """
+
+        #expect(TextPipeline.containsPromptExampleLeak(
+            output: "Alpha, beta.",
+            prompt: prompt,
+            transcript: "current words"
+        ))
+    }
+
+    @Test
     func longTranscriptIsChunkedAndConcatenated() async {
         let sandbox = makeSandbox()
         let replacementStore = ReplacementStore(fileURL: sandbox.appendingPathComponent("replacements.json"))

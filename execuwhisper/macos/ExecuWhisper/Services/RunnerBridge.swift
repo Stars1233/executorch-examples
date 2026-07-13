@@ -170,6 +170,7 @@ actor RunnerBridge {
     private var runtimeState: ResidencyState = .unloaded
     private var lastError: RunnerError?
     private var pendingRequest: PendingRequest?
+    private var stdoutTask: Task<Void, Never>?
 
     func health() -> RuntimeSnapshot {
         RuntimeSnapshot(
@@ -228,6 +229,8 @@ actor RunnerBridge {
 
         process = nil
         stdinHandle = nil
+        stdoutTask?.cancel()
+        stdoutTask = nil
         stderrAccumulator = DataAccumulator()
         activeConfiguration = nil
         activeTraceID = nil
@@ -332,8 +335,15 @@ actor RunnerBridge {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
+        let (stdoutStream, stdoutContinuation) = AsyncStream<String>.makeStream()
         let stdoutLines = LineAccumulator { line in
-            Task { await self.handleHelperLine(line, traceID: traceID) }
+            stdoutContinuation.yield(line)
+        }
+        stdoutTask?.cancel()
+        stdoutTask = Task {
+            for await line in stdoutStream {
+                await self.handleHelperLine(line, traceID: traceID)
+            }
         }
 
         process.terminationHandler = { process in
@@ -370,6 +380,7 @@ actor RunnerBridge {
                 stdoutLines.append(data)
             }
             stdoutLines.flush()
+            stdoutContinuation.finish()
         }
 
         let stderrAccumulator = self.stderrAccumulator
@@ -438,8 +449,11 @@ actor RunnerBridge {
 
         do {
             let headerData = try JSONEncoder().encode(header) + Data("\n".utf8)
-            try stdinHandle.write(contentsOf: headerData)
-            try stdinHandle.write(contentsOf: pcmData)
+            try await Self.writeTranscriptionRequest(
+                headerData: headerData,
+                pcmData: pcmData,
+                to: stdinHandle
+            )
         } catch {
             finishPendingRequest(throwing: RunnerError.launchFailed(description: error.localizedDescription))
             throw RunnerError.launchFailed(description: error.localizedDescription)
@@ -533,7 +547,7 @@ actor RunnerBridge {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 
-    private static func loadPCMFloat32MonoWAV(from url: URL) throws -> Data {
+    static func loadPCMFloat32MonoWAV(from url: URL) throws -> Data {
         let data = try Data(contentsOf: url)
         guard data.count > 44 else {
             throw RunnerError.transcriptionFailed(description: "Recorded WAV file is too small.")
@@ -541,13 +555,13 @@ actor RunnerBridge {
 
         func readUInt16(at offset: Int) -> UInt16 {
             data.withUnsafeBytes { bytes in
-                bytes.load(fromByteOffset: offset, as: UInt16.self).littleEndian
+                bytes.loadUnaligned(fromByteOffset: offset, as: UInt16.self).littleEndian
             }
         }
 
         func readUInt32(at offset: Int) -> UInt32 {
             data.withUnsafeBytes { bytes in
-                bytes.load(fromByteOffset: offset, as: UInt32.self).littleEndian
+                bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self).littleEndian
             }
         }
 
@@ -579,6 +593,17 @@ actor RunnerBridge {
         }
 
         throw RunnerError.transcriptionFailed(description: "Recorded WAV file is missing PCM data.")
+    }
+
+    private static func writeTranscriptionRequest(
+        headerData: Data,
+        pcmData: Data,
+        to handle: FileHandle
+    ) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            try handle.write(contentsOf: headerData)
+            try handle.write(contentsOf: pcmData)
+        }.value
     }
 
     private static func encodeJSONLine(_ dictionary: [String: Any]) throws -> Data {

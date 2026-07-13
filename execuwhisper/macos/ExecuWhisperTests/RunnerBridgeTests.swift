@@ -22,6 +22,34 @@ struct RunnerBridgeTests {
     }
 
     @Test
+    func wavParserHandlesTwoByteAlignedChunkHeader() throws {
+        let sandbox = makeSandbox()
+        let audioURL = sandbox.appendingPathComponent("two-byte-aligned.wav")
+        let expectedPCM = Data([0, 0, 0, 0, 0, 0, 128, 63])
+        var wav = Data("RIFF".utf8)
+        appendLittleEndian(UInt32(0), to: &wav)
+        wav.append(Data("WAVEfmt ".utf8))
+        appendLittleEndian(UInt32(18), to: &wav)
+        appendLittleEndian(UInt16(3), to: &wav)
+        appendLittleEndian(UInt16(1), to: &wav)
+        appendLittleEndian(UInt32(16_000), to: &wav)
+        appendLittleEndian(UInt32(64_000), to: &wav)
+        appendLittleEndian(UInt16(4), to: &wav)
+        appendLittleEndian(UInt16(32), to: &wav)
+        appendLittleEndian(UInt16(0), to: &wav)
+        wav.append(Data("data".utf8))
+        appendLittleEndian(UInt32(expectedPCM.count), to: &wav)
+        wav.append(expectedPCM)
+        var riffSize = UInt32(wav.count - 8).littleEndian
+        withUnsafeBytes(of: &riffSize) { wav.replaceSubrange(4..<8, with: $0) }
+        try wav.write(to: audioURL)
+
+        let parsed = try RunnerBridge.loadPCMFloat32MonoWAV(from: audioURL)
+
+        #expect(parsed == expectedPCM)
+    }
+
+    @Test
     func warmHelperIsReusedAcrossTwoRequests() async throws {
         let sandbox = makeSandbox()
         let launchCountURL = sandbox.appendingPathComponent("launch_count.txt")
@@ -205,6 +233,11 @@ struct RunnerBridgeTests {
     private func makePCMData(sampleCount: Int) -> Data {
         var samples = (0..<sampleCount).map { Float($0) / Float(max(sampleCount, 1)) }
         return Data(bytes: &samples, count: samples.count * MemoryLayout<Float>.size)
+    }
+
+    private func appendLittleEndian<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
+        var littleEndian = value.littleEndian
+        withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
     }
 
     private func createDummyFile(named name: String, in sandbox: URL) -> URL {

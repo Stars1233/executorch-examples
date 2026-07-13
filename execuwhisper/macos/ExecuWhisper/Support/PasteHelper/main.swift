@@ -17,7 +17,7 @@ private enum ExitCode {
     static let eventCreationFailed: Int32 = 70
 }
 
-private let helperVersion = "2"
+private let helperVersion = "3"
 
 private func accessibilityTrusted(prompt: Bool) -> Bool {
     let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): prompt] as CFDictionary

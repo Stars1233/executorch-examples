@@ -198,6 +198,7 @@ final class DictationManager {
                 dismissPanel()
                 state = .idle
                 dictationStartTime = nil
+                targetApp = nil
             }
 
             guard !result.outputText.isEmpty else { return }
@@ -229,18 +230,21 @@ final class DictationManager {
             dismissPanel()
             state = .idle
             dictationStartTime = nil
+            targetApp = nil
         } catch let error as RunnerError {
             dictationLog.error("Dictation failed with RunnerError: \(error.localizedDescription, privacy: .public)")
             store.currentError = error
             dismissPanel()
             state = .idle
             dictationStartTime = nil
+            targetApp = nil
         } catch {
             dictationLog.error("Dictation failed with unexpected error: \(error.localizedDescription, privacy: .public)")
             store.currentError = .transcriptionFailed(description: error.localizedDescription)
             dismissPanel()
             state = .idle
             dictationStartTime = nil
+            targetApp = nil
         }
     }
 

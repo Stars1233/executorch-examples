@@ -804,9 +804,10 @@ final class TranscriptStore {
 
     private func scheduleRecordingLimit(onLimit: @escaping @MainActor () async -> Void) {
         cancelRecordingLimit()
-        guard maxRecordingDuration > 0 else { return }
+        let recordingDuration = maxRecordingDuration
+        guard recordingDuration > 0 else { return }
         recordingLimitTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(maxRecordingDuration))
+            try? await Task.sleep(for: .seconds(recordingDuration))
             guard let self, self.sessionState == .recording else { return }
             self.statusMessage = "Maximum recording duration reached"
             self.currentError = .transcriptionFailed(description: "Maximum recording duration reached.")

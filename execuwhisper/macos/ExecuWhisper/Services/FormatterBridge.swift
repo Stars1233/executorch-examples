@@ -139,6 +139,7 @@ actor FormatterBridge: FormatterBridgeClient {
     private var lastError: RunnerError?
     private var pendingRequest: PendingRequest?
     private var pendingTimeoutTask: Task<Void, Never>?
+    private var stdoutTask: Task<Void, Never>?
     private var statusMessage = ""
 
     func runtimeSnapshot() -> RuntimeSnapshot {
@@ -199,6 +200,8 @@ actor FormatterBridge: FormatterBridgeClient {
 
         process = nil
         stdinHandle = nil
+        stdoutTask?.cancel()
+        stdoutTask = nil
         stderrAccumulator = FormatterDataAccumulator()
         activeConfiguration = nil
         activeTraceID = nil
@@ -275,8 +278,15 @@ actor FormatterBridge: FormatterBridgeClient {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
+        let (stdoutStream, stdoutContinuation) = AsyncStream<String>.makeStream()
         let stdoutLines = FormatterLineAccumulator { line in
-            Task { await self.handleHelperLine(line, traceID: traceID) }
+            stdoutContinuation.yield(line)
+        }
+        stdoutTask?.cancel()
+        stdoutTask = Task {
+            for await line in stdoutStream {
+                await self.handleHelperLine(line, traceID: traceID)
+            }
         }
 
         process.terminationHandler = { process in
@@ -313,6 +323,7 @@ actor FormatterBridge: FormatterBridgeClient {
                 stdoutLines.append(data)
             }
             stdoutLines.flush()
+            stdoutContinuation.finish()
         }
 
         let stderrAccumulator = self.stderrAccumulator

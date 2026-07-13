@@ -259,10 +259,14 @@ final class TextPipeline {
             return nil
         }
         if lowercased.hasPrefix("options:")
-            || lowercased.hasPrefix("examples:")
-            || lowercased.contains("does it feel like real-time processing?")
-            || lowercased.contains("what is the next step?")
-            || lowercased.contains("okay, so the plan is finish the build") {
+            || lowercased.hasPrefix("examples:") {
+            return nil
+        }
+        if Self.containsPromptExampleLeak(
+            output: trimmed,
+            prompt: prompt,
+            transcript: transcript
+        ) {
             return nil
         }
         if trimmed.contains("<|startoftext|>")
@@ -277,6 +281,35 @@ final class TextPipeline {
             return nil
         }
         return trimmed
+    }
+
+    static func containsPromptExampleLeak(output: String, prompt: String, transcript: String) -> Bool {
+        let lines = prompt.components(separatedBy: .newlines)
+        guard let examplesStart = lines.firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces) == "Examples:"
+        }), let currentDictation = lines.lastIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces).hasPrefix("Dictation:")
+        }), examplesStart < currentDictation else {
+            return false
+        }
+
+        let normalizedOutput = normalizedLeakText(output)
+        let normalizedTranscript = normalizedLeakText(transcript)
+        return lines[(examplesStart + 1)..<currentDictation].contains { line in
+            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+            guard trimmedLine.hasPrefix("Output:") else { return false }
+            let example = normalizedLeakText(String(trimmedLine.dropFirst("Output:".count)))
+            return !example.isEmpty
+                && normalizedOutput.contains(example)
+                && !normalizedTranscript.contains(example)
+        }
+    }
+
+    private static func normalizedLeakText(_ text: String) -> String {
+        text.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     static func isFormatterOutputSuspiciouslyShort(transcript: String, output: String) -> Bool {
