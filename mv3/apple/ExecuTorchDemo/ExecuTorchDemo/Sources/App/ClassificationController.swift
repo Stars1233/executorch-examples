@@ -13,6 +13,17 @@ import SwiftUI
 enum Mode: String, CaseIterable {
   case xnnpack = "XNNPACK"
   case coreML = "Core ML"
+  case mlx = "MLX"
+
+  static var allCases: [Mode] {
+    // The MLX delegate reports itself unavailable on the simulator, so loading a
+    // model there fails. Offer it only where it can run.
+    #if targetEnvironment(simulator)
+      return [.xnnpack, .coreML]
+    #else
+      return [.xnnpack, .coreML, .mlx]
+    #endif
+  }
 }
 
 class ClassificationController: ObservableObject {
@@ -62,6 +73,8 @@ class ClassificationController: ObservableObject {
     switch mode {
     case .coreML:
       modelFileName = "mv3_coreml_all"
+    case .mlx:
+      modelFileName = "mv3_mlx"
     case .xnnpack:
       modelFileName = "mv3_xnnpack_fp32"
     }

@@ -25,6 +25,14 @@ final class MobileNetClassifierTest: XCTestCase {
     try run(model: "mv3_xnnpack_fp32")
   }
 
+  func testV3WithMLXBackend() throws {
+    #if targetEnvironment(simulator)
+      throw XCTSkip("The MLX delegate reports itself unavailable on the simulator.")
+    #else
+      try run(model: "mv3_mlx")
+    #endif
+  }
+
   private func run(model modelName: String) throws {
     guard
       let modelFilePath = Bundle(for: type(of: self))
